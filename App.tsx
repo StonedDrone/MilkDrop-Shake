@@ -42,8 +42,8 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     
     // 8. FRACTAL EXCITATION (uTreble)
     float field = 0.0;
-    float layers = 3.0 + floor(uTreble * 4.0);
-    for(float i=1.0; i<8.0; i++) {
+    float layers = (3.0 + floor(uTreble * 4.0)) * uFidelity;
+    for(float i=1.0; i<16.0; i++) {
         if(i > layers) break;
         float strength = 0.08 / abs(sin(uTime * 0.1 + uv.x * i * 1.5 + uTreble * 2.0) * 1.5 + uv.y * i);
         field += strength;
@@ -155,7 +155,9 @@ const App: React.FC = () => {
         startMorphing();
       }
     } else if (source === 'spotify') {
-      startMorphing();
+      if (spotifyToken) {
+        startMorphing();
+      }
     }
   };
 
@@ -175,25 +177,34 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSpotifyConnect = () => {
+    window.location.href = getSpotifyAuthUrl();
+  };
+
   useEffect(() => {
     if (!spotifyToken || morphSource !== 'spotify') return;
     const poll = async () => {
       const track = await fetchCurrentTrack(spotifyToken);
       if (track) {
         setCurrentTrack(track);
+        // Calculate beat intensity using tempo and current progress
+        const beatDuration = 60000 / (track.tempo || 120);
+        const beatPhase = (track.progress_ms % beatDuration) / beatDuration;
+        const pulse = Math.pow(Math.max(0, 1.0 - Math.abs(beatPhase - 0.5) * 2), 4);
+
         setCurrentVoiceState({
             volume: track.isPlaying ? track.energy : 0,
             pitch: track.danceability,
-            bass: track.energy * 0.8,
+            bass: track.energy * 0.9,
             mid: track.energy * 0.6,
             treble: track.danceability * 0.4,
             silence: !track.isPlaying,
-            beatIntensity: track.isPlaying ? (Math.sin(track.progress_ms / (60000 / track.tempo) * 3.14159) * 0.5 + 0.5) : 0
+            beatIntensity: track.isPlaying ? pulse : 0
         });
       }
     };
     poll();
-    const interval = setInterval(poll, 2000);
+    const interval = setInterval(poll, 1500);
     return () => clearInterval(interval);
   }, [spotifyToken, morphSource]);
 
@@ -399,15 +410,21 @@ const App: React.FC = () => {
                     </div>
                     <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-3">Live Morph Source</div>
                     {morphSource === 'spotify' ? (
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-black/50 border border-white/10">
-                                {currentTrack?.albumArt ? <img src={currentTrack.albumArt} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#1DB954]"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-4h2v4zm4 0h-2V8h2v8z"/></svg></div>}
+                        spotifyToken ? (
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-black/50 border border-white/10">
+                                    {currentTrack?.albumArt ? <img src={currentTrack.albumArt} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#1DB954]"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-4h2v4zm4 0h-2V8h2v8z"/></svg></div>}
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-sm font-bold truncate">{currentTrack?.name || 'Nothing playing'}</div>
+                                    <div className="text-[10px] text-white/40 truncate uppercase font-bold tracking-tighter">{currentTrack?.artist || 'Waiting for sync'}</div>
+                                </div>
                             </div>
-                            <div className="min-w-0">
-                                <div className="text-sm font-bold truncate">{currentTrack?.name || 'Nothing playing'}</div>
-                                <div className="text-[10px] text-white/40 truncate uppercase font-bold tracking-tighter">{currentTrack?.artist || 'Waiting for sync'}</div>
-                            </div>
-                        </div>
+                        ) : (
+                            <button onClick={handleSpotifyConnect} className="w-full py-2 bg-[#1DB954] text-black text-[10px] font-black rounded-xl uppercase tracking-widest hover:brightness-110 transition-all">
+                                Connect Spotify
+                            </button>
+                        )
                     ) : morphSource === 'file' ? (
                         <div className="space-y-4">
                             <div className="text-sm font-bold truncate pr-6">{localAudioFile?.name || 'No file selected'}</div>
@@ -561,7 +578,7 @@ const App: React.FC = () => {
                                         </>
                                     )}
                                     {settingsTab === 'vis' && (
-                                        <>
+                                        <div className="col-span-full grid grid-cols-1 sm:grid-cols-3 gap-8">
                                             <div className="space-y-4">
                                                 <div className="flex justify-between text-[10px] font-black uppercase text-white/40 tracking-widest"><span>Global Intensity</span><span className="text-cyan-400">{morphicSettings.visual.globalIntensity.toFixed(2)}</span></div>
                                                 <input type="range" min="0" max="2" step="0.01" value={morphicSettings.visual.globalIntensity} onChange={(e) => updateVis('globalIntensity', parseFloat(e.target.value))} className="w-full accent-cyan-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer" />
@@ -572,7 +589,12 @@ const App: React.FC = () => {
                                                 <input type="range" min="0" max="1" step="0.01" value={morphicSettings.visual.colorShift} onChange={(e) => updateVis('colorShift', parseFloat(e.target.value))} className="w-full accent-purple-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer" />
                                                 <p className="text-[10px] text-white/20 font-bold leading-tight">Rotates the base hue of the energy field composition.</p>
                                             </div>
-                                        </>
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between text-[10px] font-black uppercase text-white/40 tracking-widest"><span>Visual Fidelity</span><span className="text-pink-400">{morphicSettings.visual.fidelity.toFixed(2)}</span></div>
+                                                <input type="range" min="0.1" max="2" step="0.05" value={morphicSettings.visual.fidelity} onChange={(e) => updateVis('fidelity', parseFloat(e.target.value))} className="w-full accent-pink-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer" />
+                                                <p className="text-[10px] text-white/20 font-bold leading-tight">Geometric resolution and detail complexity of the morphic layers.</p>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>

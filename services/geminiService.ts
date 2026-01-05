@@ -66,6 +66,7 @@ export const generateModernShader = async (preset: MilkPreset): Promise<string> 
         - uniform float uViscosity;  // Fluidity / tail length of motion.
         - uniform float uFlow;       // Continuous directional drift speed.
         - uniform float uColorShift; // Base color palette rotation.
+        - uniform float uFidelity;  // Detail / complexity multiplier.
 
         MANDATORY RULES:
         1. NO FLASHES: Never map audio to direct brightness spikes.
@@ -73,7 +74,8 @@ export const generateModernShader = async (preset: MilkPreset): Promise<string> 
         3. GEOMETRIC PRIORITY: Audio features MUST displace UV coordinates or modulate distance fields.
         4. TOPOLOGICAL LOCK: If uTime freezes (silence), the form must remain in its unique distorted state.
         5. ENVIRONMENTAL HARMONY: Use uTurbulence to add fine-grained wind-like or water-like surface noise.
-        6. PRESERVE PERSONALITY: The original MilkDrop preset's mathematical soul (spirals, mirrors, etc.) must be the foundation.
+        6. FIDELITY INTEGRATION: Use uFidelity to modulate loop iterations or fractal detail depth.
+        7. PRESERVE PERSONALITY: The original MilkDrop preset's mathematical soul (spirals, mirrors, etc.) must be the foundation.
         
         MilkDrop Logic to translate:
         ${preset.rawContent.slice(0, 3500)}`,

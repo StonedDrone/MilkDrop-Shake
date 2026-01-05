@@ -1,7 +1,8 @@
 
 import { SpotifyTrack } from '../types';
 
-const CLIENT_ID = 'YOUR_CLIENT_ID'; // Placeholder: User would typically provide their own
+// NOTE: To use this in production, a Client ID must be registered at developer.spotify.com
+const CLIENT_ID = 'YOUR_SPOTIFY_CLIENT_ID'; 
 const REDIRECT_URI = window.location.origin;
 const SCOPES = ['user-read-currently-playing', 'user-read-playback-state'];
 
@@ -20,23 +21,37 @@ export const fetchCurrentTrack = async (token: string): Promise<SpotifyTrack | n
     const data = await response.json();
     if (!data.item) return null;
 
-    // To truly get energy/danceability, we'd need another call to /audio-features/{id}
-    // For this implementation, we poll the main item and mock features for demo if not fetched
-    // to maintain the "Morphic" feel without excessive API overhead.
+    const trackId = data.item.id;
+    
+    // Fetch high-fidelity audio features for Morphic mapping
+    const featuresResponse = await fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    let energy = 0.5;
+    let danceability = 0.5;
+    let tempo = 120;
+
+    if (featuresResponse.ok) {
+      const features = await featuresResponse.json();
+      energy = features.energy;
+      danceability = features.danceability;
+      tempo = features.tempo;
+    }
     
     return {
       name: data.item.name,
       artist: data.item.artists[0].name,
       albumArt: data.item.album.images[0].url,
-      energy: 0.7, // Default morphic base
-      danceability: 0.6,
-      tempo: 120,
+      energy: energy,
+      danceability: danceability,
+      tempo: tempo,
       progress_ms: data.progress_ms,
       duration_ms: data.item.duration_ms,
       isPlaying: data.is_playing
     };
   } catch (err) {
-    console.error("Spotify Fetch Error:", err);
+    console.error("Spotify Integration Error:", err);
     return null;
   }
 };

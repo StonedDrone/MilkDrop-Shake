@@ -54,6 +54,7 @@ const ShaderPreview: React.FC<ShaderPreviewProps> = ({ shaderCode, voiceState, i
       uniform float uViscosity;
       uniform float uFlow;
       uniform float uColorShift;
+      uniform float uFidelity;
 
       #define iTime uTime
       #define iResolution vec3(uResolution, 1.0)
@@ -102,6 +103,7 @@ const ShaderPreview: React.FC<ShaderPreviewProps> = ({ shaderCode, voiceState, i
       visc: gl.getUniformLocation(program, 'uViscosity'),
       flow: gl.getUniformLocation(program, 'uFlow'),
       cshift: gl.getUniformLocation(program, 'uColorShift'),
+      fidelity: gl.getUniformLocation(program, 'uFidelity'),
     };
 
     let lastTime = performance.now();
@@ -134,6 +136,7 @@ const ShaderPreview: React.FC<ShaderPreviewProps> = ({ shaderCode, voiceState, i
       gl.uniform1f(uLoc.visc, settings.environment.viscosity);
       gl.uniform1f(uLoc.flow, settings.environment.flow);
       gl.uniform1f(uLoc.cshift, settings.visual.colorShift);
+      gl.uniform1f(uLoc.fidelity, settings.visual.fidelity);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       requestRef.current = requestAnimationFrame(render);
