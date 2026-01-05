@@ -42,6 +42,18 @@ export interface SpotifyTrack {
   isPlaying: boolean;
 }
 
+export interface AudioFileAnalysis {
+  tempo: number;
+  energy: number;
+  spectralCentroid: number;
+  rms: number;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+}
+
 // Added missing BeatSettings interface to resolve import error in services/voiceEngine.ts
 export interface BeatSettings {
   enabled: boolean;

@@ -1,11 +1,17 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { MilkPreset, PresetAnalysis } from "../types";
+import { MilkPreset, PresetAnalysis, ChatMessage } from "../types";
 
-// Removed global initialization to ensure fresh instances per call as per guidelines
+const checkApiKeySelection = async () => {
+  if (typeof window !== 'undefined' && (window as any).aistudio) {
+    const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+    if (!hasKey) {
+      await (window as any).aistudio.openSelectKey();
+    }
+  }
+};
 
 export const analyzePreset = async (preset: MilkPreset): Promise<PresetAnalysis> => {
-  // Always initialize right before use to ensure latest API key
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const codeSnippet = `
@@ -37,12 +43,10 @@ export const analyzePreset = async (preset: MilkPreset): Promise<PresetAnalysis>
     }
   });
 
-  // Use .text property directly, not as a method
   return JSON.parse(response.text || '{}');
 };
 
 export const generateModernShader = async (preset: MilkPreset): Promise<string> => {
-    // Always initialize right before use
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
@@ -80,12 +84,80 @@ export const generateModernShader = async (preset: MilkPreset): Promise<string> 
         MilkDrop Logic to translate:
         ${preset.rawContent.slice(0, 3500)}`,
     });
-    // Use .text property directly
     return response.text || '// Failed to generate shader code.';
 };
 
+export const chatWithGemini = async (messages: ChatMessage[]): Promise<string> => {
+  await checkApiKeySelection();
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const history = messages.slice(0, -1).map(m => ({
+    role: m.role,
+    parts: [{ text: m.text }]
+  }));
+  
+  const chat = ai.chats.create({
+    model: 'gemini-3-pro-preview',
+    config: {
+      systemInstruction: "You are the Morphic Assistant, an expert in procedural graphics, GLSL, and MilkDrop preset evolution. You help users understand mathematical art and how sound influences topology. Keep your tone sophisticated and helpful.",
+    }
+  });
+
+  const lastMessage = messages[messages.length - 1].text;
+  const response = await chat.sendMessage({ message: lastMessage });
+  return response.text || "I am unable to respond at the moment.";
+};
+
+export const analyzeVideo = async (videoBase64: string, mimeType: string): Promise<string> => {
+  await checkApiKeySelection();
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview',
+    contents: {
+      parts: [
+        { inlineData: { data: videoBase64, mimeType } },
+        { text: "Analyze this video. What are the key visual elements, rhythmic patterns, and overall aesthetic themes? Provide a concise summary that could help in generating a procedural shader inspired by this video." }
+      ]
+    }
+  });
+  return response.text || "Analysis failed.";
+};
+
+export const animateImageWithVeo = async (imageBase64: string, mimeType: string, prompt: string, isPortrait: boolean): Promise<string> => {
+  await checkApiKeySelection();
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  try {
+    let operation = await ai.models.generateVideos({
+      model: 'veo-3.1-fast-generate-preview',
+      prompt: prompt || 'A cinematic fluid animation of this image, morphing and flowing elegantly.',
+      image: {
+        imageBytes: imageBase64,
+        mimeType: mimeType,
+      },
+      config: {
+        numberOfVideos: 1,
+        resolution: '720p',
+        aspectRatio: isPortrait ? '9:16' : '16:9'
+      }
+    });
+
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      operation = await ai.operations.getVideosOperation({ operation: operation });
+    }
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+    if (!downloadLink) throw new Error("Video generation failed");
+    return `${downloadLink}&key=${process.env.API_KEY}`;
+  } catch (error: any) {
+    if (error.message?.includes("Requested entity was not found.") && typeof window !== 'undefined' && (window as any).aistudio) {
+        await (window as any).aistudio.openSelectKey();
+    }
+    throw error;
+  }
+};
+
 export const imagineVisual = async (analysis: PresetAnalysis): Promise<string> => {
-  // Always initialize right before use
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
@@ -107,7 +179,6 @@ export const imagineVisual = async (analysis: PresetAnalysis): Promise<string> =
     }
   });
 
-  // Iterate through parts to find the image part
   for (const part of response.candidates?.[0]?.content?.parts || []) {
     if (part.inlineData) {
       return `data:image/png;base64,${part.inlineData.data}`;
@@ -117,15 +188,7 @@ export const imagineVisual = async (analysis: PresetAnalysis): Promise<string> =
 };
 
 export const generateVideoPreview = async (analysis: PresetAnalysis): Promise<string> => {
-  // Guidelines: For Veo models, mandatory check for API key selection
-  if (typeof window !== 'undefined' && (window as any).aistudio) {
-    const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-    if (!hasKey) {
-      await (window as any).aistudio.openSelectKey();
-    }
-  }
-
-  // Always initialize right before use to ensure latest API key
+  await checkApiKeySelection();
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
@@ -146,11 +209,8 @@ export const generateVideoPreview = async (analysis: PresetAnalysis): Promise<st
 
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!downloadLink) throw new Error("Video generation failed");
-    
-    // Append API key when fetching from the download link as per guidelines
     return `${downloadLink}&key=${process.env.API_KEY}`;
   } catch (error: any) {
-    // Guidelines: Reset key selection state if "Requested entity was not found."
     if (error.message?.includes("Requested entity was not found.") && typeof window !== 'undefined' && (window as any).aistudio) {
         await (window as any).aistudio.openSelectKey();
     }

@@ -2,6 +2,7 @@
   "name": "MilkDrop Shake",
   "description": "A sophisticated tool to parse, analyze, and convert legacy .milk (MilkDrop) visualization presets into structured JSON or modern GLSL shaders using AI.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }
