@@ -1,15 +1,15 @@
 
 import React, { useEffect, useRef } from 'react';
-import { VoiceState } from '../types';
+import { VoiceState, MorphicSettings } from '../types';
 
 interface ShaderPreviewProps {
   shaderCode: string;
   voiceState: VoiceState;
   isActive: boolean;
-  beatAmplitude: number;
+  settings: MorphicSettings;
 }
 
-const ShaderPreview: React.FC<ShaderPreviewProps> = ({ shaderCode, voiceState, isActive, beatAmplitude }) => {
+const ShaderPreview: React.FC<ShaderPreviewProps> = ({ shaderCode, voiceState, isActive, settings }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(0);
   const timeRef = useRef<number>(0);
@@ -49,6 +49,11 @@ const ShaderPreview: React.FC<ShaderPreviewProps> = ({ shaderCode, voiceState, i
       uniform float uMid;
       uniform float uTreble;
       uniform float uBeat;
+      
+      uniform float uTurbulence;
+      uniform float uViscosity;
+      uniform float uFlow;
+      uniform float uColorShift;
 
       #define iTime uTime
       #define iResolution vec3(uResolution, 1.0)
@@ -93,6 +98,10 @@ const ShaderPreview: React.FC<ShaderPreviewProps> = ({ shaderCode, voiceState, i
       mid: gl.getUniformLocation(program, 'uMid'),
       tre: gl.getUniformLocation(program, 'uTreble'),
       beat: gl.getUniformLocation(program, 'uBeat'),
+      turb: gl.getUniformLocation(program, 'uTurbulence'),
+      visc: gl.getUniformLocation(program, 'uViscosity'),
+      flow: gl.getUniformLocation(program, 'uFlow'),
+      cshift: gl.getUniformLocation(program, 'uColorShift'),
     };
 
     let lastTime = performance.now();
@@ -102,21 +111,29 @@ const ShaderPreview: React.FC<ShaderPreviewProps> = ({ shaderCode, voiceState, i
 
       // TOPOLOGICAL LOCK: Suspend time progression during silence
       if (!voiceState.silence) {
-        timeRef.current += dt; 
+        timeRef.current += dt * (1.0 / (settings.environment.viscosity + 0.1)); 
       }
 
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
+      // Global multiplier for all morphic parameters
+      const intensity = settings.visual.globalIntensity;
+
       gl.uniform1f(uLoc.time, timeRef.current);
       gl.uniform2f(uLoc.res, gl.canvas.width, gl.canvas.height);
-      gl.uniform1f(uLoc.vol, voiceState.volume);
-      gl.uniform1f(uLoc.pit, voiceState.pitch);
-      gl.uniform1f(uLoc.bas, voiceState.bass);
-      gl.uniform1f(uLoc.mid, voiceState.mid);
-      gl.uniform1f(uLoc.tre, voiceState.treble);
-      gl.uniform1f(uLoc.beat, voiceState.beatIntensity * beatAmplitude);
+      gl.uniform1f(uLoc.vol, voiceState.volume * intensity);
+      gl.uniform1f(uLoc.pit, voiceState.pitch * intensity);
+      gl.uniform1f(uLoc.bas, voiceState.bass * intensity);
+      gl.uniform1f(uLoc.mid, voiceState.mid * intensity);
+      gl.uniform1f(uLoc.tre, voiceState.treble * intensity);
+      gl.uniform1f(uLoc.beat, voiceState.beatIntensity * settings.beat.amplitude * intensity);
+      
+      gl.uniform1f(uLoc.turb, settings.environment.turbulence);
+      gl.uniform1f(uLoc.visc, settings.environment.viscosity);
+      gl.uniform1f(uLoc.flow, settings.environment.flow);
+      gl.uniform1f(uLoc.cshift, settings.visual.colorShift);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       requestRef.current = requestAnimationFrame(render);
@@ -138,9 +155,9 @@ const ShaderPreview: React.FC<ShaderPreviewProps> = ({ shaderCode, voiceState, i
       window.removeEventListener('resize', handleResize);
       gl.deleteProgram(program);
     };
-  }, [shaderCode, isActive, voiceState, beatAmplitude]);
+  }, [shaderCode, isActive, voiceState, settings]);
 
-  return <canvas ref={canvasRef} className="w-full h-full rounded-3xl" />;
+  return <canvas ref={canvasRef} className="w-full h-full rounded-3xl shadow-2xl" />;
 };
 
 export default ShaderPreview;

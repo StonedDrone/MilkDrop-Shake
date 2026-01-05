@@ -42,11 +42,26 @@ export interface SpotifyTrack {
   isPlaying: boolean;
 }
 
+// Added missing BeatSettings interface to resolve import error in services/voiceEngine.ts
 export interface BeatSettings {
   enabled: boolean;
-  amplitude: number;    // Multiplier for uBeat
-  sensitivity: number;  // Threshold for detection
-  decay: number;        // Rate at which uBeat returns to 0
+  amplitude: number;
+  sensitivity: number;
+  decay: number;
+}
+
+export interface MorphicSettings {
+  beat: BeatSettings;
+  environment: {
+    turbulence: number; // Chaos/noise frequency
+    viscosity: number;  // Motion smoothing/resistance
+    flow: number;       // Directional bias speed
+  };
+  visual: {
+    colorShift: number; // Hue rotation
+    fidelity: number;   // Detail scale
+    globalIntensity: number; // Global morphing power multiplier
+  };
 }
 
 export type ViewState = 'upload' | 'list' | 'detail';
